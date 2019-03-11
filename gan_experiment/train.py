@@ -1,7 +1,6 @@
 from torch.utils import data
 import os
 from gan_experiment.definitions import ROOT_DIR
-from skimage import io, transform
 import torch
 import torchvision.transforms as transforms
 import torchvision.datasets as dset
@@ -15,10 +14,10 @@ from torch import optim
 # Create the dataset
 
 dataroot = ROOT_DIR + '/image_folder'
-image_size = 1024
+image_size = 64
 
 # Size of z latent vector (i.e. size of generator input)
-nz = 800
+nz = 100
 
 # Size of feature maps in generator
 ngf = image_size
@@ -29,7 +28,7 @@ ndf = image_size
 batch_size = 8
 
 # Number of training epochs
-num_epochs = 5
+num_epochs = 20
 
 # Learning rate for optimizers
 lr = 0.0002
@@ -54,7 +53,7 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Plot some training images
-plt.imshow(np.transpose(vutils.make_grid(dataset[100][0].to(device), padding=2, normalize=True).cpu(),(1,2,0)))
+plt.imshow(np.transpose(vutils.make_grid(dataset[500][0].to(device), padding=2, normalize=True).cpu(),(1,2,0)))
 plt.show()
 
 # custom weights initialization called on netG and netD
@@ -170,6 +169,10 @@ iters = 0
 
 print("Starting Training Loop...")
 # For each epoch
+
+if device == 'cuda':
+    torch.cuda.empty_cache()
+
 for epoch in range(num_epochs):
     # For each batch in the dataloader
     for i, data in enumerate(dataloader, 0):
@@ -241,3 +244,18 @@ for epoch in range(num_epochs):
             img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
 
         iters += 1
+
+
+plt.figure(figsize=(10,5))
+plt.title("Generator and Discriminator Loss During Training")
+plt.plot(G_losses,label="G")
+plt.plot(D_losses,label="D")
+plt.xlabel("iterations")
+plt.ylabel("Loss")
+plt.legend()
+plt.show()
+
+#%%capture
+fig = plt.figure(figsize=(4, 4))
+plt.axis("off")
+ims = [[plt.imshow(np.transpose(i,(1,2,0)), animated=True)] for i in img_list]
