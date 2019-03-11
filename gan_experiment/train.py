@@ -14,7 +14,7 @@ from torch import optim
 # Create the dataset
 
 dataroot = ROOT_DIR + '/image_folder'
-image_size = 64
+image_size = 512
 
 # Size of z latent vector (i.e. size of generator input)
 nz = 100
@@ -25,7 +25,7 @@ ngf = image_size
 # Size of feature maps in discriminator
 ndf = image_size
 
-batch_size = 8
+batch_size = 4
 
 # Number of training epochs
 num_epochs = 20
@@ -53,7 +53,7 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Plot some training images
-plt.imshow(np.transpose(vutils.make_grid(dataset[500][0].to(device), padding=2, normalize=True).cpu(),(1,2,0)))
+plt.imshow(np.transpose(vutils.make_grid(dataset[915][0].to('cpu'), padding=2, normalize=True).cpu(),(1,2,0)))
 plt.show()
 
 # custom weights initialization called on netG and netD
@@ -75,18 +75,18 @@ class Generator(nn.Module):
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
-            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.ReLU(True),
             # state size. (ngf*4) x 8 x 8
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
-            # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+            # # state size. (ngf*2) x 16 x 16
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            # state size. (ngf) x 32 x 32
+            # # state size. (ngf) x 32 x 32
             nn.ConvTranspose2d(ngf, 3, 4, 2, 1, bias=False),
             nn.Tanh()
             # state size. (nc) x 64 x 64
@@ -96,8 +96,11 @@ class Generator(nn.Module):
         return self.main(input)
 
 # Create the generator
+# torch.cuda.empty_cache()
 netG = Generator().to(device)
-
+# noise = torch.randn(1, nz, 1, 1, device=device)
+# z = netG(noise)
+# print(z.shape)
 # Apply the weights_init function to randomly initialize all weights
 #  to mean=0, stdev=0.2.
 netG.apply(weights_init)
@@ -114,15 +117,15 @@ class Discriminator(nn.Module):
             nn.Conv2d(3, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
-            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+            nn.Conv2d(ndf, ndf * 2, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*2) x 16 x 16
-            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
-            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
@@ -176,7 +179,7 @@ if device == 'cuda':
 for epoch in range(num_epochs):
     # For each batch in the dataloader
     for i, data in enumerate(dataloader, 0):
-
+        torch.cuda.empty_cache()
         ############################
         # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
         ###########################
