@@ -9,12 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
 from torch import optim
+import numpy as np
 
 # We can use an image folder dataset the way we have it setup.
 # Create the dataset
 
 dataroot = ROOT_DIR + '/image_folder'
-image_size = 512
+image_size = 64
 
 # Size of z latent vector (i.e. size of generator input)
 nz = 100
@@ -28,7 +29,7 @@ ndf = image_size
 batch_size = 4
 
 # Number of training epochs
-num_epochs = 20
+num_epochs = 5
 
 # Learning rate for optimizers
 lr = 0.0002
@@ -38,10 +39,13 @@ beta1 = 0.5
 
 dataset = dset.ImageFolder(root=dataroot,
                            transform=transforms.Compose([
+                               transforms.RandomHorizontalFlip(),
+                               transforms.RandomRotation(5),
                                transforms.Resize(image_size),
                                transforms.CenterCrop(image_size),
                                transforms.ToTensor(),
                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                               # transforms.RandomCrop(image_size, fill=0.5)
                            ]))
 
 print("number of images: {}".format(len(dataset)))
@@ -52,8 +56,9 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Plot some training images
-plt.imshow(np.transpose(vutils.make_grid(dataset[915][0].to('cpu'), padding=2, normalize=True).cpu(),(1,2,0)))
+# Plot a random criminal
+n = np.random.choice(list(range(len(dataset))), 1)[0]
+plt.imshow(np.transpose(vutils.make_grid(dataset[n][0].to('cpu'), padding=2, normalize=True).cpu(),(1,2,0)))
 plt.show()
 
 # custom weights initialization called on netG and netD
@@ -75,20 +80,20 @@ class Generator(nn.Module):
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # state size. (ngf*8) x 4 x 4
-            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 4, 0, bias=False),
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
             nn.ReLU(True),
             # state size. (ngf*4) x 8 x 8
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 4, 0, bias=False),
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.ReLU(True),
             # # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(ngf * 2, ngf, 4, 4, 0, bias=False),
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
             # # state size. (ngf) x 32 x 32
             nn.ConvTranspose2d(ngf, 3, 4, 2, 1, bias=False),
-            nn.Tanh()
+            nn.Tanh(),
             # state size. (nc) x 64 x 64
         )
 
@@ -117,15 +122,15 @@ class Discriminator(nn.Module):
             nn.Conv2d(3, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
-            nn.Conv2d(ndf, ndf * 2, 4, 4, 0, bias=False),
+            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*2) x 16 x 16
-            nn.Conv2d(ndf * 2, ndf * 4, 4, 4, 0, bias=False),
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
-            nn.Conv2d(ndf * 4, ndf * 8, 4, 4, 0, bias=False),
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
@@ -231,7 +236,7 @@ for epoch in range(num_epochs):
         optimizerG.step()
 
         # Output training stats
-        if i % 2 == 0:
+        if i % 10 == 0:
             print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
                   % (epoch, num_epochs, i, len(dataloader),
                      errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
