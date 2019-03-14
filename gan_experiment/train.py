@@ -17,6 +17,8 @@ import numpy as np
 dataroot = ROOT_DIR + '/image_folder'
 image_size = 256
 
+channels = 3
+
 # Size of z latent vector (i.e. size of generator input)
 nz = 150
 
@@ -26,10 +28,10 @@ ngf = image_size
 # Size of feature maps in discriminator
 ndf = image_size
 
-batch_size = 4
+batch_size = 16
 
 # Number of training epochs
-num_epochs = 20
+num_epochs = 10
 
 # Learning rate for optimizers
 lr = 0.0003
@@ -39,12 +41,13 @@ beta1 = 0.5
 
 dataset = dset.ImageFolder(root=dataroot,
                            transform=transforms.Compose([
+                               # transforms.Grayscale(num_output_channels=channels),
                                transforms.RandomHorizontalFlip(),
                                transforms.RandomRotation(5),
                                transforms.Resize(image_size),
-                               transforms.RandomCrop(image_size, fill=0.5),
+                               transforms.CenterCrop(image_size),
                                transforms.ToTensor(),
-                               transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                               transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
                                # transforms.RandomCrop(image_size, fill=0.5)
                            ]))
 
@@ -58,8 +61,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Plot a random criminal
 n = np.random.choice(list(range(len(dataset))), 1)[0]
-plt.imshow(np.transpose(vutils.make_grid(dataset[n][0].to('cpu'), padding=2, normalize=True).cpu(),(1,2,0)))
-plt.show()
+# plt.imshow(np.transpose(vutils.make_grid(dataset[n][0].to('cpu'), padding=2, normalize=True).cpu(),(1,2,0)))
+# plt.show()
 
 # custom weights initialization called on netG and netD
 def weights_init(m):
@@ -84,7 +87,7 @@ class Generator(nn.Module):
             nn.BatchNorm2d(ngf * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ngf*4) x 8 x 8
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ngf * 2),
             nn.LeakyReLU(0.2, inplace=True),
             # # state size. (ngf*2) x 16 x 16
@@ -92,7 +95,7 @@ class Generator(nn.Module):
             nn.BatchNorm2d(ngf),
             nn.LeakyReLU(0.2, inplace=True),
             # # state size. (ngf) x 32 x 32
-            nn.ConvTranspose2d(ngf, 3, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(ngf, channels, 4, 2, 1, bias=False),
             nn.Tanh(),
             # state size. (nc) x 64 x 64
         )
@@ -119,14 +122,14 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(
             # input is (nc) x 64 x 64
-            nn.Conv2d(3, ndf, 4, 2, 1, bias=False),
+            nn.Conv2d(channels, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
             nn.Conv2d(ndf, ndf * 2, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*2) x 16 x 16
-            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 4, 0, bias=False),
             nn.BatchNorm2d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*4) x 8 x 8
@@ -195,7 +198,7 @@ for epoch in range(num_epochs):
         real_cpu = data[0].to(device)
         b_size = real_cpu.size(0)
         # label = torch.full((b_size,), real_label, device=device)
-        label = torch.FloatTensor(b_size, device=device).uniform(0.7, 1.2) # label smoothing
+        label = torch.FloatTensor(b_size).uniform_(0.7, 1.2).to(device) # label smoothing
         # Forward pass real batch through D
         output = netD(real_cpu).view(-1)
         # Calculate loss on all-real batch
@@ -209,7 +212,7 @@ for epoch in range(num_epochs):
         noise = torch.randn(b_size, nz, 1, 1, device=device)
         # Generate fake image batch with G
         fake = netG(noise)
-        label = torch.FloatTensor(b_size, device=device).uniform(0, 0.3)  # label smoothing
+        label = torch.FloatTensor(b_size).uniform_(0, 0.3).to(device)  # label smoothing
         # Classify all fake batch with D
         output = netD(fake.detach()).view(-1)
         # Calculate D's loss on the all-fake batch
@@ -227,7 +230,7 @@ for epoch in range(num_epochs):
         ###########################
         netG.zero_grad()
         # label.fill_(real_label)  # fake labels are real for generator cost
-        label = torch.FloatTensor(b_size, device=device).uniform(0.7, 1.2)  # label smoothing
+        label = torch.FloatTensor(b_size).uniform_(0.7, 1.2).to(device)  # label smoothing
         # Since we just updated D, perform another forward pass of all-fake batch through D
         output = netD(fake).view(-1)
         # Calculate G's loss based on this output
